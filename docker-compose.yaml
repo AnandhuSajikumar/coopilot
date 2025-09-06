@@ -1,15 +1,15 @@
 services:
-   frontend:
-       build: ./apps/web
-       command: pnpm dev
-       ports:
-         - "3000:3000"
-       volumes: 
-         - ./apps/web:/app
-         - /app/node_modules
-       working_dir: /app
+  frontend:
+    build: ./apps/web
+    command: pnpm dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./apps/web:/app
+      - /app/node_modules
+    working_dir: /app
 
-   backend:
+  backend:
     build: ./apps/api
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     ports:
@@ -17,3 +17,20 @@ services:
     volumes:
       - ./apps/api:/app
     working_dir: /app
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/coopilot
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: coopilot
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+volumes:
+  db_data:
