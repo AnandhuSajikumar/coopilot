@@ -19,9 +19,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create DB tables (auto-create for now, migrations later)
-Base.metadata.create_all(bind=engine)
-
 # DB session dependency
 def get_db():
     db = SessionLocal()
