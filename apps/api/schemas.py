@@ -10,8 +10,8 @@ class NoteCreate(NoteBase):
 class NoteUpdate(NoteBase):
     pass
 
-class NoteResponse(NoteBase):
+class Note(NoteBase):
     id: int
 
     class Config:
-        orm_mode = True
+        from_attributes = True   # replaces orm_mode in Pydantic v2

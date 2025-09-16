@@ -1,76 +1,61 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-import os
-
-from .database import SessionLocal, engine
-from .models import Base, Note
-from .schemas import NoteCreate, NoteUpdate, NoteResponse
+import models, schemas, database
 
 app = FastAPI()
 
-# Enable CORS (for frontend ↔ backend)
+# CORS setup
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # allow all in dev
+    allow_origins=["*"],  # allow all origins for now
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# DB session dependency
+models.Base.metadata.create_all(bind=database.engine)
+
+
 def get_db():
-    db = SessionLocal()
+    db = database.SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-# ---- Health + Ping ----
-@app.get("/health")
-def health():
-    with engine.connect() as conn:
-        result = conn.execute(text("SELECT 1"))
-        return {"ok": True, "db": result.scalar() == 1}
 
-@app.get("/ping")
-def ping():
-    return {"message": "pong from backend"}
+@app.get("/notes")
+def read_notes(db: Session = Depends(get_db)):
+    return db.query(models.Note).all()
 
-# ---- Notes CRUD ----
-@app.post("/notes", response_model=NoteResponse)
-def create_note(note: NoteCreate, db: Session = Depends(get_db)):
-    db_note = Note(title=note.title, content=note.content)
+
+@app.post("/notes", response_model=schemas.Note)
+def create_note(note: schemas.NoteCreate, db: Session = Depends(get_db)):
+    db_note = models.Note(title=note.title, content=note.content)
     db.add(db_note)
     db.commit()
     db.refresh(db_note)
     return db_note
 
-@app.get("/notes", response_model=list[NoteResponse])
-def get_notes(db: Session = Depends(get_db)):
-    return db.query(Note).all()
 
-@app.get("/notes/{note_id}", response_model=NoteResponse)
-def get_note(note_id: int, db: Session = Depends(get_db)):
-    return db.query(Note).filter(Note.id == note_id).first()
-
-@app.put("/notes/{note_id}", response_model=NoteResponse)
-def update_note(note_id: int, note: NoteUpdate, db: Session = Depends(get_db)):
-    db_note = db.query(Note).filter(Note.id == note_id).first()
+@app.put("/notes/{note_id}", response_model=schemas.Note)
+def update_note(note_id: int, updated_note: schemas.NoteCreate, db: Session = Depends(get_db)):
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if not db_note:
-        return {"error": "Note not found"}
-    db_note.title = note.title
-    db_note.content = note.content
+        raise HTTPException(status_code=404, detail="Note not found")
+    db_note.title = updated_note.title
+    db_note.content = updated_note.content
     db.commit()
     db.refresh(db_note)
     return db_note
 
+
 @app.delete("/notes/{note_id}")
 def delete_note(note_id: int, db: Session = Depends(get_db)):
-    db_note = db.query(Note).filter(Note.id == note_id).first()
+    db_note = db.query(models.Note).filter(models.Note.id == note_id).first()
     if not db_note:
-        return {"error": "Note not found"}
+        raise HTTPException(status_code=404, detail="Note not found")
     db.delete(db_note)
     db.commit()
-    return {"message": "Note deleted"}
+    return {"message": "Note deleted successfully"}
